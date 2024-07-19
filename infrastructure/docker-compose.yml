@@ -1,0 +1,60 @@
+version: '3'
+services:
+  users-app:
+    build: '../user-app-test'
+    container_name: users-app
+    ports:
+      - 3000:3000
+    env_file:
+      - './env/user-app.env'
+    restart: always
+    depends_on:
+      localstack:
+        condition: service_healthy
+      users-db:
+        condition: service_started
+
+  notification-receiver:
+    build: '../notification-receiver'
+    container_name: notification-receiver
+    env_file:
+      - './env/notification-receiver.env'
+    restart: always
+    depends_on:
+      localstack:
+        condition: service_healthy
+
+  localstack:
+    container_name: '${LOCALSTACK_DOCKER_NAME:-localstack-main}'
+    build: '../localstack'
+    ports:
+      - '127.0.0.1:4566:4566' # LocalStack Gateway
+      - '127.0.0.1:4510-4559:4510-4559' # external services port range
+    env_file:
+      - './env/localstack.env'
+    volumes:
+      - '${LOCALSTACK_VOLUME_DIR:-../localstack-volume}:/var/lib/localstack'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - awslocal sns list-topics && awslocal sqs list-queues
+      interval: 5s
+      timeout: 10s
+
+  users-db:
+    image: postgres:16.3-alpine
+    container_name: users-db
+    restart: always
+    # or set shared memory limit when deploy via swarm stack
+    volumes:
+      - type: tmpfs
+        target: /dev/shm
+        tmpfs:
+          size: 134217728 # 128*2^20 bytes = 128Mb
+    ports:
+      - '5432:5432'
+    env_file:
+      - './env/users-db.env'

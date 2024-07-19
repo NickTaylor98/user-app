@@ -1,0 +1,4 @@
+localstack-volume
+node_modules
+.vscode
+infrastructure/env/*.env
